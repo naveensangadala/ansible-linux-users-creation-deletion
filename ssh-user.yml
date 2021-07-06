@@ -1,5 +1,5 @@
 ---
- - hosts: webservers or all
+ - hosts: all
    vars:
      - devops_password: 'dev123hnk'
    gather_facts: no
