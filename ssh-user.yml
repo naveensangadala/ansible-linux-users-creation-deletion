@@ -1,0 +1,76 @@
+---
+ - hosts: webservers or all
+   vars:
+     - devops_password: 'dev123hnk'
+   gather_facts: no
+   remote_user: root
+   become: true
+   tasks:
+    - name: Add a new user named devops
+      user:
+          name: devops
+          shell: /bin/bash
+          password: "{{ devops_password }}"
+    - name: Add devops user to the sudoers
+      copy:
+          dest: "/etc/sudoers.d/devops"
+          content: "devops  ALL=(ALL)  NOPASSWD: ALL"
+
+    - name: generate ssh keys for the user devops
+      shell: ssh-keygen -t rsa -f /home/devops/.ssh/id_rsa -q -N ""
+      become: yes
+      become_user: devops
+      args:
+         creates: /home/devops/.ssh/id_rsa
+      register: ssh_keys
+
+    - name: retrieve pub key
+      shell: cat /home/devops/.ssh/id_rsa.pub
+      register: pub_key
+
+    - name: check keys
+      debug:
+        msg: "{{ pub_key.stdout}}"
+
+    - set_fact: keys = "{{ pub_key.stdout }}"
+
+    - name: create authorized keys file
+      file:
+        path: "/home/devops/.ssh/authorized_keys"
+        state: touch
+
+    - name: copy pubkey authorized_keys of root
+      copy:
+         src: /home/devops/.ssh/id_rsa.pub
+         dest: /home/devops/.ssh/authorized_keys
+         owner: root
+         group: root
+         mode: 0644
+         remote_src: yes
+    - name: Deploy SSH Key
+      authorized_key:
+          user: devops
+          key: "{{ lookup('file', '/home/devops/.ssh/id_rsa.pub') }}"
+          state: present
+    - name: Disable Password Authentication
+      lineinfile:
+           dest=/etc/ssh/sshd_config
+           regexp='^PasswordAuthentication'
+           line="PasswordAuthentication no"
+           state=present
+           backup=yes
+    - name: Disable Root Login
+      lineinfile:
+           dest=/etc/ssh/sshd_config
+           regexp='^PermitRootLogin'
+           line="PermitRootLogin no"
+           state=present
+           backup=yes
+      notify:
+        - restart ssh
+
+   handlers:
+      - name: restart ssh
+        service:
+          name=sshd
+          state=restarted

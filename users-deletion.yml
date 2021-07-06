@@ -1,0 +1,20 @@
+---
+- hosts: webservers
+#  connection: local
+  vars:
+    users:
+    - "Mark"
+    - "Jero"
+    - "devops"
+  tasks:
+#    - name: Verify that admin group exists 
+#      group:
+#        name: admin
+#        state: absent
+#        remove: yes
+    - name: "Create user accounts"
+      user:
+        name: "{{ item }}"
+        state: absent
+        remove: yes
+      with_items: "{{ users }}"
